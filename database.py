@@ -1,7 +1,18 @@
-import mysql.connector
+﻿import mysql.connector
 from mysql.connector import Error
 import hashlib
-from config import DB_CONFIG
+import os
+
+# Načítanie konfigurácie z environment variables
+DB_CONFIG = {
+    'host': os.environ.get('DB_HOST', 'localhost'),
+    'port': int(os.environ.get('DB_PORT', 3306)),
+    'user': os.environ.get('DB_USER', ''),
+    'password': os.environ.get('DB_PASSWORD', ''),
+    'database': os.environ.get('DB_NAME', ''),
+    'charset': 'utf8mb4',
+    'autocommit': True
+}
 
 class DatabaseManager:
     def __init__(self):
@@ -9,32 +20,32 @@ class DatabaseManager:
         self.connect()
     
     def connect(self):
-        """Pripojenie k MySQL databáze"""
+        """Pripojenie k MySQL databĂˇze"""
         try:
             self.connection = mysql.connector.connect(**DB_CONFIG)
             if self.connection.is_connected():
-                print("Úspešne pripojené k MySQL databáze")
+                print("ĂšspeĹˇne pripojenĂ© k MySQL databĂˇze")
         except Error as e:
-            print(f"Chyba pri pripojení k databáze: {e}")
+            print(f"Chyba pri pripojenĂ­ k databĂˇze: {e}")
             self.connection = None
     
     def disconnect(self):
-        """Odpojenie od databázy"""
+        """Odpojenie od databĂˇzy"""
         if self.connection and self.connection.is_connected():
             self.connection.close()
-            print("Odpojené od MySQL databázy")
+            print("OdpojenĂ© od MySQL databĂˇzy")
     
     def ensure_connection(self):
-        """Overí a obnoví pripojenie ak je potrebné"""
+        """OverĂ­ a obnovĂ­ pripojenie ak je potrebnĂ©"""
         try:
             if self.connection is None or not self.connection.is_connected():
-                print("Pripojenie stratené, pokúšam sa znovu pripojiť...")
+                print("Pripojenie stratenĂ©, pokĂşĹˇam sa znovu pripojiĹĄ...")
                 self.connect()
             else:
                 # Test pripojenia
                 self.connection.ping(reconnect=True, attempts=3, delay=1)
         except Error as e:
-            print(f"Chyba pri testovaní pripojenia: {e}")
+            print(f"Chyba pri testovanĂ­ pripojenia: {e}")
             self.connect()
     
     def hash_password(self, password):
@@ -42,7 +53,7 @@ class DatabaseManager:
         return hashlib.sha256(password.encode()).hexdigest()
     
     def authenticate_user(self, username, password):
-        """Overenie prihlasovacích údajov používateľa"""
+        """Overenie prihlasovacĂ­ch Ăşdajov pouĹľĂ­vateÄľa"""
         self.ensure_connection()
         
         if not self.connection:
@@ -63,11 +74,11 @@ class DatabaseManager:
             
             return user
         except Error as e:
-            print(f"Chyba pri overovaní používateľa: {e}")
+            print(f"Chyba pri overovanĂ­ pouĹľĂ­vateÄľa: {e}")
             return None
     
     def get_clients_by_warehouse(self, warehouse):
-        """Získanie klientov podľa skladu"""
+        """ZĂ­skanie klientov podÄľa skladu"""
         self.ensure_connection()
         
         if not self.connection:
@@ -87,11 +98,11 @@ class DatabaseManager:
             
             return clients
         except Error as e:
-            print(f"Chyba pri získavaní klientov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ klientov: {e}")
             return []
     
     def add_client(self, client_name, warehouse, created_by):
-        """Pridanie nového klienta"""
+        """Pridanie novĂ©ho klienta"""
         self.ensure_connection()
         
         if not self.connection:
@@ -109,11 +120,11 @@ class DatabaseManager:
             
             return True
         except Error as e:
-            print(f"Chyba pri pridávaní klienta: {e}")
+            print(f"Chyba pri pridĂˇvanĂ­ klienta: {e}")
             return False
     
     def remove_client(self, client_id, warehouse):
-        """Odstránenie klienta (označenie ako neaktívny)"""
+        """OdstrĂˇnenie klienta (oznaÄŤenie ako neaktĂ­vny)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -132,11 +143,11 @@ class DatabaseManager:
             
             return True
         except Error as e:
-            print(f"Chyba pri odstraňovaní klienta: {e}")
+            print(f"Chyba pri odstraĹovanĂ­ klienta: {e}")
             return False
     
     def start_time_record(self, user_id, client_id, description=""):
-        """Začatie záznamu času"""
+        """ZaÄŤatie zĂˇznamu ÄŤasu"""
         self.ensure_connection()
         
         if not self.connection:
@@ -155,11 +166,11 @@ class DatabaseManager:
             
             return record_id
         except Error as e:
-            print(f"Chyba pri začatí záznamu času: {e}")
+            print(f"Chyba pri zaÄŤatĂ­ zĂˇznamu ÄŤasu: {e}")
             return None
     
     def end_time_record(self, record_id, task_id=None, custom_task_name=None):
-        """Ukončenie záznamu času s voliteľným úkonom"""
+        """UkonÄŤenie zĂˇznamu ÄŤasu s voliteÄľnĂ˝m Ăşkonom"""
         self.ensure_connection()
         
         if not self.connection:
@@ -181,11 +192,11 @@ class DatabaseManager:
             
             return True
         except Error as e:
-            print(f"Chyba pri ukončení záznamu času: {e}")
+            print(f"Chyba pri ukonÄŤenĂ­ zĂˇznamu ÄŤasu: {e}")
             return False
     
     def cancel_time_record(self, record_id):
-        """Zrušenie (zmazanie) aktívneho záznamu času"""
+        """ZruĹˇenie (zmazanie) aktĂ­vneho zĂˇznamu ÄŤasu"""
         self.ensure_connection()
         
         if not self.connection:
@@ -193,7 +204,7 @@ class DatabaseManager:
         
         try:
             cursor = self.connection.cursor()
-            # Zmažeme len aktívne záznamy (tie ktoré nemajú end_time)
+            # ZmaĹľeme len aktĂ­vne zĂˇznamy (tie ktorĂ© nemajĂş end_time)
             query = "DELETE FROM time_records WHERE id = %s AND end_time IS NULL"
             cursor.execute(query, (record_id,))
             self.connection.commit()
@@ -202,11 +213,11 @@ class DatabaseManager:
             
             return deleted_count > 0
         except Error as e:
-            print(f"Chyba pri zrušení záznamu času: {e}")
+            print(f"Chyba pri zruĹˇenĂ­ zĂˇznamu ÄŤasu: {e}")
             return False
     
     def get_user_time_records(self, user_id, limit=50):
-        """Získanie posledných záznamov času používateľa"""
+        """ZĂ­skanie poslednĂ˝ch zĂˇznamov ÄŤasu pouĹľĂ­vateÄľa"""
         self.ensure_connection()
         
         if not self.connection:
@@ -229,11 +240,11 @@ class DatabaseManager:
             
             return records
         except Error as e:
-            print(f"Chyba pri získavaní záznamov času: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ zĂˇznamov ÄŤasu: {e}")
             return []
     
     def get_warehouse_time_records(self, warehouse, start_date=None, end_date=None):
-        """Získanie všetkých záznamov času pre konkrétny sklad"""
+        """ZĂ­skanie vĹˇetkĂ˝ch zĂˇznamov ÄŤasu pre konkrĂ©tny sklad"""
         self.ensure_connection()
         
         if not self.connection:
@@ -242,7 +253,7 @@ class DatabaseManager:
         try:
             cursor = self.connection.cursor(dictionary=True)
             
-            # Základný query s LEFT JOIN pre tasks
+            # ZĂˇkladnĂ˝ query s LEFT JOIN pre tasks
             query = """
             SELECT 
                 tr.id,
@@ -265,7 +276,7 @@ class DatabaseManager:
             
             params = [warehouse]
             
-            # Pridanie filtrov pre dátumy
+            # Pridanie filtrov pre dĂˇtumy
             if start_date:
                 query += " AND DATE(tr.start_time) >= %s"
                 params.append(start_date)
@@ -282,11 +293,11 @@ class DatabaseManager:
             
             return records
         except Error as e:
-            print(f"Chyba pri získavaní záznamov skladu: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ zĂˇznamov skladu: {e}")
             return []
     
     def get_all_time_records(self, start_date=None, end_date=None):
-        """Získanie všetkých záznamov času zo všetkých skladov"""
+        """ZĂ­skanie vĹˇetkĂ˝ch zĂˇznamov ÄŤasu zo vĹˇetkĂ˝ch skladov"""
         self.ensure_connection()
         
         if not self.connection:
@@ -333,11 +344,11 @@ class DatabaseManager:
             
             return records
         except Error as e:
-            print(f"Chyba pri získavaní všetkých záznamov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ vĹˇetkĂ˝ch zĂˇznamov: {e}")
             return []
     
     def delete_time_record(self, record_id, warehouse):
-        """Vymazanie jedného časového záznamu (len pre záznamy z daného skladu)"""
+        """Vymazanie jednĂ©ho ÄŤasovĂ©ho zĂˇznamu (len pre zĂˇznamy z danĂ©ho skladu)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -357,11 +368,11 @@ class DatabaseManager:
             
             return affected > 0
         except Error as e:
-            print(f"Chyba pri mazaní záznamu: {e}")
+            print(f"Chyba pri mazanĂ­ zĂˇznamu: {e}")
             return False
     
     def delete_multiple_time_records(self, record_ids, warehouse):
-        """Vymazanie viacerých časových záznamov naraz"""
+        """Vymazanie viacerĂ˝ch ÄŤasovĂ˝ch zĂˇznamov naraz"""
         self.ensure_connection()
         
         if not self.connection or not record_ids:
@@ -389,15 +400,15 @@ class DatabaseManager:
             
             return affected
         except Error as e:
-            print(f"Chyba pri mazaní viacerých záznamov: {e}")
+            print(f"Chyba pri mazanĂ­ viacerĂ˝ch zĂˇznamov: {e}")
             return False
     
     # ============================================
-    # API METÓDY PRE WEAR OS
+    # API METĂ“DY PRE WEAR OS
     # ============================================
     
     def verify_user(self, username, password_hash):
-        """Overenie používateľa pre API (už hashované heslo)"""
+        """Overenie pouĹľĂ­vateÄľa pre API (uĹľ hashovanĂ© heslo)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -416,11 +427,11 @@ class DatabaseManager:
             
             return user
         except Error as e:
-            print(f"Chyba pri overovaní používateľa: {e}")
+            print(f"Chyba pri overovanĂ­ pouĹľĂ­vateÄľa: {e}")
             return None
     
     def get_clients(self, warehouse):
-        """Získanie klientov pre API (tuple formát)"""
+        """ZĂ­skanie klientov pre API (tuple formĂˇt)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -440,11 +451,11 @@ class DatabaseManager:
             
             return clients
         except Error as e:
-            print(f"Chyba pri získavaní klientov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ klientov: {e}")
             return []
     
     def get_user_by_username(self, username):
-        """Získanie používateľa podľa username (tuple formát)"""
+        """ZĂ­skanie pouĹľĂ­vateÄľa podÄľa username (tuple formĂˇt)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -463,11 +474,11 @@ class DatabaseManager:
             
             return user
         except Error as e:
-            print(f"Chyba pri získavaní používateľa: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ pouĹľĂ­vateÄľa: {e}")
             return None
     
     def get_active_time_record(self, user_id):
-        """Získanie aktívneho časového záznamu pre používateľa"""
+        """ZĂ­skanie aktĂ­vneho ÄŤasovĂ©ho zĂˇznamu pre pouĹľĂ­vateÄľa"""
         self.ensure_connection()
         
         if not self.connection:
@@ -493,15 +504,15 @@ class DatabaseManager:
             
             return record
         except Error as e:
-            print(f"Chyba pri získavaní aktívneho záznamu: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ aktĂ­vneho zĂˇznamu: {e}")
             return None
     
     # ============================================
-    # SPRÁVA POUŽÍVATEĽOV (ADMIN)
+    # SPRĂVA POUĹ˝ĂŤVATEÄ˝OV (ADMIN)
     # ============================================
     
     def get_users_by_warehouse(self, warehouse):
-        """Získanie všetkých používateľov z daného skladu"""
+        """ZĂ­skanie vĹˇetkĂ˝ch pouĹľĂ­vateÄľov z danĂ©ho skladu"""
         self.ensure_connection()
         
         if not self.connection:
@@ -521,11 +532,11 @@ class DatabaseManager:
             
             return users
         except Error as e:
-            print(f"Chyba pri získavaní používateľov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ pouĹľĂ­vateÄľov: {e}")
             return []
     
     def add_user(self, username, password, full_name, warehouse, role='user'):
-        """Pridanie nového používateľa"""
+        """Pridanie novĂ©ho pouĹľĂ­vateÄľa"""
         self.ensure_connection()
         
         if not self.connection:
@@ -545,11 +556,11 @@ class DatabaseManager:
             
             return True
         except Error as e:
-            print(f"Chyba pri pridávaní používateľa: {e}")
+            print(f"Chyba pri pridĂˇvanĂ­ pouĹľĂ­vateÄľa: {e}")
             return False
     
     def deactivate_user(self, user_id, warehouse):
-        """Deaktivácia používateľa (len pre používateľov z daného skladu)"""
+        """DeaktivĂˇcia pouĹľĂ­vateÄľa (len pre pouĹľĂ­vateÄľov z danĂ©ho skladu)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -569,11 +580,11 @@ class DatabaseManager:
             
             return affected > 0
         except Error as e:
-            print(f"Chyba pri deaktivácii používateľa: {e}")
+            print(f"Chyba pri deaktivĂˇcii pouĹľĂ­vateÄľa: {e}")
             return False
     
     def activate_user(self, user_id, warehouse):
-        """Aktivácia používateľa (len pre používateľov z daného skladu)"""
+        """AktivĂˇcia pouĹľĂ­vateÄľa (len pre pouĹľĂ­vateÄľov z danĂ©ho skladu)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -593,11 +604,11 @@ class DatabaseManager:
             
             return affected > 0
         except Error as e:
-            print(f"Chyba pri aktivácii používateľa: {e}")
+            print(f"Chyba pri aktivĂˇcii pouĹľĂ­vateÄľa: {e}")
             return False
     
     def change_user_password(self, user_id, new_password, warehouse):
-        """Zmena hesla používateľa (len pre používateľov z daného skladu)"""
+        """Zmena hesla pouĹľĂ­vateÄľa (len pre pouĹľĂ­vateÄľov z danĂ©ho skladu)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -623,7 +634,7 @@ class DatabaseManager:
             return False
     
     def username_exists(self, username):
-        """Kontrola či username už existuje"""
+        """Kontrola ÄŤi username uĹľ existuje"""
         self.ensure_connection()
         
         if not self.connection:
@@ -642,7 +653,7 @@ class DatabaseManager:
             return False
     
     def delete_user(self, user_id, warehouse):
-        """Úplné vymazanie používateľa (len pre používateľov z daného skladu, nie adminov)"""
+        """ĂšplnĂ© vymazanie pouĹľĂ­vateÄľa (len pre pouĹľĂ­vateÄľov z danĂ©ho skladu, nie adminov)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -650,7 +661,7 @@ class DatabaseManager:
         
         try:
             cursor = self.connection.cursor()
-            # Vymaže len non-admin používateľov z daného skladu
+            # VymaĹľe len non-admin pouĹľĂ­vateÄľov z danĂ©ho skladu
             query = """
             DELETE FROM users 
             WHERE id = %s AND warehouse = %s AND role != 'admin'
@@ -662,15 +673,15 @@ class DatabaseManager:
             
             return affected > 0
         except Error as e:
-            print(f"Chyba pri mazaní používateľa: {e}")
+            print(f"Chyba pri mazanĂ­ pouĹľĂ­vateÄľa: {e}")
             return False
     
     # ============================================
-    # SPRÁVA ÚKONOV (TASKS)
+    # SPRĂVA ĂšKONOV (TASKS)
     # ============================================
     
     def get_tasks_by_warehouse(self, warehouse):
-        """Získanie úkonov pre daný sklad"""
+        """ZĂ­skanie Ăşkonov pre danĂ˝ sklad"""
         self.ensure_connection()
         
         if not self.connection:
@@ -690,11 +701,11 @@ class DatabaseManager:
             
             return tasks
         except Error as e:
-            print(f"Chyba pri získavaní úkonov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ Ăşkonov: {e}")
             return []
     
     def get_tasks(self, warehouse):
-        """Získanie úkonov pre API (tuple formát)"""
+        """ZĂ­skanie Ăşkonov pre API (tuple formĂˇt)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -714,11 +725,11 @@ class DatabaseManager:
             
             return tasks
         except Error as e:
-            print(f"Chyba pri získavaní úkonov: {e}")
+            print(f"Chyba pri zĂ­skavanĂ­ Ăşkonov: {e}")
             return []
     
     def add_task(self, task_name, warehouse, created_by):
-        """Pridanie nového úkonu"""
+        """Pridanie novĂ©ho Ăşkonu"""
         self.ensure_connection()
         
         if not self.connection:
@@ -736,11 +747,11 @@ class DatabaseManager:
             
             return True
         except Error as e:
-            print(f"Chyba pri pridávaní úkonu: {e}")
+            print(f"Chyba pri pridĂˇvanĂ­ Ăşkonu: {e}")
             return False
     
     def remove_task(self, task_id, warehouse):
-        """Odstránenie úkonu (len vlastné, nie predefinované)"""
+        """OdstrĂˇnenie Ăşkonu (len vlastnĂ©, nie predefinovanĂ©)"""
         self.ensure_connection()
         
         if not self.connection:
@@ -760,5 +771,5 @@ class DatabaseManager:
             
             return affected > 0
         except Error as e:
-            print(f"Chyba pri odstraňovaní úkonu: {e}")
+            print(f"Chyba pri odstraĹovanĂ­ Ăşkonu: {e}")
             return False
