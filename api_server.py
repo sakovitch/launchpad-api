@@ -10,13 +10,13 @@ import datetime
 from functools import wraps
 import hashlib
 from database import DatabaseManager
-from config import SECRET_KEY
+import os
 
 app = Flask(__name__)
 CORS(app)  # Povolí requesty z iných zariadení
 
 # Tajný kľúč pre JWT tokeny
-app.config['SECRET_KEY'] = SECRET_KEY
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
 
 db = DatabaseManager()
 
