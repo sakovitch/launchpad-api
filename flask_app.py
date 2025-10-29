@@ -171,7 +171,7 @@ def start_timer(current_user):
     if not user:
         return jsonify({'error': 'Používateľ nenájdený'}), 401
     
-    user_id = user[0]  # ID je prvý prvok tuple
+    user_id = user['id']  # ID z dictionary
     client_id = data['client_id']
     
     # Skontroluj či už má aktívny záznam
@@ -267,7 +267,7 @@ def get_active_timer(current_user):
     if not user:
         return jsonify({'error': 'Používateľ nenájdený'}), 401
     
-    user_id = user[0]
+    user_id = user['id']  # ID z dictionary
     
     # Skontroluj aktívny záznam
     active = db.get_active_time_record(user_id)
