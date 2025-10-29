@@ -1,6 +1,7 @@
 """
-REST API Server pre Launchpad Dashboard
+REST API Server pre Launchpad Dashboard - Production verzia
 Umožňuje prepojenie s Wear OS hodinkami
+Všetky citlivé údaje sa načítavajú z environment variables
 """
 
 from flask import Flask, request, jsonify
@@ -9,14 +10,16 @@ import jwt
 import datetime
 from functools import wraps
 import hashlib
-from database import DatabaseManager
 import os
+
+from database import DatabaseManager
+from config import SECRET_KEY
 
 app = Flask(__name__)
 CORS(app)  # Povolí requesty z iných zariadení
 
-# Tajný kľúč pre JWT tokeny
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
+# Tajný kľúč pre JWT tokeny (načítaný z config.py - environment variable)
+app.config['SECRET_KEY'] = SECRET_KEY
 
 db = DatabaseManager()
 
@@ -66,7 +69,7 @@ def health_check():
     """Kontrola či API beží"""
     return jsonify({
         'status': 'online',
-        'message': 'Launchpad Dashboard API v1.0',
+        'message': 'Launchpad Dashboard API v2.0',
         'timestamp': datetime.datetime.now().isoformat()
     })
 
@@ -83,10 +86,10 @@ def login():
         return jsonify({'error': 'Username a password sú povinné'}), 400
     
     username = data['username']
-    password = hash_password(data['password'])
+    password_hash = hash_password(data['password'])
     
     # Overenie v databáze
-    user = db.verify_user(username, password)
+    user = db.verify_user(username, password_hash)
     
     if not user:
         return jsonify({'error': 'Nesprávne prihlasovacie údaje'}), 401
@@ -134,7 +137,7 @@ def get_clients(current_user):
 @token_required
 def get_tasks(current_user):
     """
-    Zoznam úkonov/actions pre daný sklad
+    Zoznam úkonov pre daný sklad
     Headers: Authorization: Bearer <token>
     """
     warehouse = current_user['warehouse']
@@ -163,17 +166,23 @@ def start_timer(current_user):
     if not data or not data.get('client_id'):
         return jsonify({'error': 'client_id je povinný'}), 400
     
-    client_id = data['client_id']
-    username = current_user['username']
-    
-    # Získaj user_id
-    user = db.get_user_by_username(username)
+    # Získaj user ID z username
+    user = db.get_user_by_username(current_user['username'])
     if not user:
-        return jsonify({'error': 'Používateľ nenájdený'}), 404
+        return jsonify({'error': 'Používateľ nenájdený'}), 401
     
-    user_id = user[0]
+    user_id = user[0]  # ID je prvý prvok tuple
+    client_id = data['client_id']
     
-    # Spusti časovač
+    # Skontroluj či už má aktívny záznam
+    active = db.get_active_time_record(user_id)
+    if active:
+        return jsonify({
+            'error': 'Máš už spustený časovač',
+            'record_id': active['record_id']
+        }), 409
+    
+    # Vytvor nový záznam
     record_id = db.start_time_record(user_id, client_id)
     
     if record_id:
@@ -183,18 +192,17 @@ def start_timer(current_user):
             'message': 'Časovač spustený'
         })
     else:
-        return jsonify({'error': 'Nepodarilo sa spustiť časovač'}), 500
+        return jsonify({
+            'success': False,
+            'message': 'Nepodarilo sa spustiť časovač'
+        }), 500
 
 @app.route('/api/timer/stop', methods=['POST'])
 @token_required
 def stop_timer(current_user):
     """
-    Zastavenie časovača
-    Body: {
-        "record_id": 123,
-        "task_id": 5,  // voliteľné - ID predefinovaného úkonu
-        "custom_task_name": "My custom action"  // voliteľné - vlastný názov úkonu
-    }
+    Zastavenie časovača s úkonom
+    Body: {"record_id": 123, "task_id": 456}
     """
     data = request.get_json()
     
@@ -202,71 +210,76 @@ def stop_timer(current_user):
         return jsonify({'error': 'record_id je povinný'}), 400
     
     record_id = data['record_id']
-    task_id = data.get('task_id')  # môže byť None
-    custom_task_name = data.get('custom_task_name')  # môže byť None
+    task_id = data.get('task_id')
+    custom_task_name = data.get('custom_task_name')
     
-    # Zastav časovač s úkonom
     success = db.end_time_record(record_id, task_id, custom_task_name)
     
     if success:
         return jsonify({
             'success': True,
+            'record_id': record_id,
             'message': 'Časovač zastavený'
         })
     else:
-        return jsonify({'error': 'Nepodarilo sa zastaviť časovač'}), 500
+        return jsonify({
+            'success': False,
+            'message': 'Nepodarilo sa zastaviť časovač'
+        }), 500
 
 @app.route('/api/timer/cancel', methods=['POST'])
 @token_required
 def cancel_timer(current_user):
     """
-    Zrušenie (zmazanie) aktívneho časovača
-    Body: { record_id: int }
+    Zrušenie (vymazanie) časovača
+    Body: {"record_id": 123}
     """
     data = request.get_json()
-    record_id = data.get('record_id')
     
-    if not record_id:
+    if not data or not data.get('record_id'):
         return jsonify({'error': 'record_id je povinný'}), 400
     
-    # Zruš záznam (zmaž ho z databázy)
+    record_id = data['record_id']
+    
     success = db.cancel_time_record(record_id)
     
     if success:
         return jsonify({
-            'message': 'Časovač zrušený',
-            'cancelled': True
+            'success': True,
+            'record_id': record_id,
+            'message': 'Časovač zrušený'
         })
     else:
-        return jsonify({'error': 'Nepodarilo sa zrušiť časovač'}), 500
+        return jsonify({
+            'success': False,
+            'message': 'Nepodarilo sa zrušiť časovač'
+        }), 500
 
 @app.route('/api/timer/active', methods=['GET'])
 @token_required
 def get_active_timer(current_user):
     """
-    Získanie aktívneho časovača pre používateľa
-    Returns: Aktívny záznam alebo null
+    Získanie aktívneho časovača
+    Headers: Authorization: Bearer <token>
     """
-    username = current_user['username']
-    
-    # Získaj user_id
-    user = db.get_user_by_username(username)
+    # Získaj user ID z username
+    user = db.get_user_by_username(current_user['username'])
     if not user:
-        return jsonify({'error': 'Používateľ nenájdený'}), 404
+        return jsonify({'error': 'Používateľ nenájdený'}), 401
     
     user_id = user[0]
     
-    # Nájdi aktívny záznam (kde end_time je NULL)
-    active_record = db.get_active_time_record(user_id)
+    # Skontroluj aktívny záznam
+    active = db.get_active_time_record(user_id)
     
-    if active_record:
+    if active:
         return jsonify({
             'active': True,
             'record': {
-                'record_id': active_record['record_id'],
-                'client_name': active_record['client_name'],
-                'start_time': active_record['start_time'].isoformat(),
-                'elapsed_seconds': active_record['elapsed_seconds']
+                'record_id': active['record_id'],
+                'client_name': active['client_name'],
+                'start_time': active['start_time'].isoformat() if active['start_time'] else None,
+                'elapsed_seconds': active['elapsed_seconds']
             }
         })
     else:
@@ -275,43 +288,28 @@ def get_active_timer(current_user):
             'record': None
         })
 
-@app.route('/api/timer/history', methods=['GET'])
-@token_required
-def get_timer_history(current_user):
-    """
-    História časových záznamov
-    Query params: ?limit=10
-    """
-    username = current_user['username']
-    warehouse = current_user['warehouse']
-    limit = request.args.get('limit', 10, type=int)
-    
-    # Získaj posledných X záznamov
-    records = db.get_user_time_records(username, warehouse, limit)
-    
-    return jsonify({
-        'records': [
-            {
-                'record_id': rec['record_id'],
-                'client_name': rec['client_name'],
-                'start_time': rec['start_time'].isoformat() if rec['start_time'] else None,
-                'end_time': rec['end_time'].isoformat() if rec['end_time'] else None,
-                'duration_seconds': rec['duration_seconds']
-            }
-            for rec in records
-        ]
-    })
+# ============================================
+# ERROR HANDLERS
+# ============================================
+
+@app.errorhandler(404)
+def not_found(error):
+    """404 - Endpoint nenájdený"""
+    return jsonify({'error': 'Endpoint nenájdený'}), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    """500 - Server error"""
+    return jsonify({'error': 'Interná chyba servera'}), 500
 
 # ============================================
-# SPUSTENIE SERVERA
+# MAIN
 # ============================================
 
 if __name__ == '__main__':
-    print("🚀 Launchpad Dashboard API Server")
-    print("📡 Beží na http://localhost:5000")
-    print("📱 Pripojené zariadenia môžu pristupovať na http://<tvoja-IP>:5000")
-    print("\n💡 Pre prístup z hodiniek musíš byť na rovnakej WiFi sieti")
-    print("=" * 60)
-    
-    # V produkcii použi host='0.0.0.0' pre prístup z iných zariadení
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Development mode
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=False
+    )

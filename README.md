@@ -1,67 +1,194 @@
-# Launchpad API Server
+# Launchpad API - v2.0
 
-REST API for Launchpad Dashboard - connects Wear OS watch app with the backend system.
+REST API server pre Launchpad Dashboard a Wear OS aplikáciu.
 
-## 🚀 Deployment (Render.com)
+## Funkcie
 
-### Environment Variables Required
+- ✅ JWT-based authentication
+- ✅ Multi-warehouse support
+- ✅ Time tracking (start/stop/cancel)
+- ✅ Client and task management
+- ✅ Environment-based configuration
+- ✅ CORS enabled
 
-Set these in Render.com dashboard:
+## Setup
 
-```
-DB_HOST=your_mysql_host
-DB_PORT=3325
-DB_USER=your_username
-DB_PASSWORD=your_password
-DB_NAME=your_database
-SECRET_KEY=your-jwt-secret-key
-```
-
-### Deploy Command
+### 1. Inštalácia dependencies
 
 ```bash
-gunicorn api_server:app
+pip install -r requirements.txt
 ```
 
-## 🔧 Local Development
+### 2. Environment Variables Setup
 
-1. Clone the repository
-2. Copy `config.example.py` to `config.py` and fill in your values
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Run the server:
-   ```bash
-   python api_server.py
-   ```
+Vytvor `.env` súbor na základe `.env.example`:
 
-## 📡 API Endpoints
+```bash
+cp .env.example .env
+```
+
+Vyplň všetky potrebné environment variables:
+
+```
+DB_HOST=sql20.hostcreators.sk
+DB_NAME=d57154_launchpadgroup
+DB_PASSWORD=...
+DB_PORT=3325
+DB_USER=d57154_launchpad
+SECRET_KEY=...
+DEBUG=False
+ENVIRONMENT=production
+```
+
+### 3. Spustenie servera (Local Development)
+
+```bash
+python flask_app.py
+```
+
+Server pobeží na `http://localhost:5000`
+
+### 4. Deployment na Render
+
+1. Push súbory na GitHub
+2. Vytvor novú Web Service na Render.com
+3. Pridaj všetky environment variables v Render dashboarde
+4. Render automaticky deploying
+
+## API Endpoints
 
 ### Authentication
-- `POST /api/login` - User login, returns JWT token
+
+**POST /api/login**
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+Response:
+```json
+{
+  "token": "eyJhbGc...",
+  "user": {
+    "username": "admin",
+    "full_name": "Admin User",
+    "warehouse": "WH1",
+    "role": "admin"
+  }
+}
+```
 
 ### Clients
-- `GET /api/clients` - Get list of clients for user's warehouse
+
+**GET /api/clients**
+```
+Headers: Authorization: Bearer <token>
+```
+
+Response:
+```json
+{
+  "clients": [
+    {"id": 1, "name": "Client A", "warehouse": "WH1"},
+    {"id": 2, "name": "Client B", "warehouse": "WH1"}
+  ]
+}
+```
 
 ### Tasks
-- `GET /api/tasks` - Get list of available tasks/actions
+
+**GET /api/tasks**
+```
+Headers: Authorization: Bearer <token>
+```
+
+Response:
+```json
+{
+  "tasks": [
+    {"id": 1, "name": "Task A", "warehouse": "WH1"},
+    {"id": 2, "name": "Task B", "warehouse": "WH1"}
+  ]
+}
+```
 
 ### Timer
-- `POST /api/timer/start` - Start timer for a client
-- `POST /api/timer/stop` - Stop timer and save record with task
-- `POST /api/timer/cancel` - Cancel timer (delete record without saving)
-- `GET /api/timer/active` - Get active timer for user
 
-## 🔒 Security
+**POST /api/timer/start**
+```json
+{
+  "client_id": 1
+}
+```
 
-⚠️ **NEVER commit `config.py` to the repository!**
+Response:
+```json
+{
+  "success": true,
+  "record_id": 123,
+  "message": "Časovač spustený"
+}
+```
 
-- `config.py` contains sensitive database credentials
-- Use environment variables in production (Render.com)
-- Use `config.example.py` as template for local development
+**POST /api/timer/stop**
+```json
+{
+  "record_id": 123,
+  "task_id": 1
+}
+```
 
-## 📱 Connected Apps
+**POST /api/timer/cancel**
+```json
+{
+  "record_id": 123
+}
+```
 
-- **Wear OS Watch App** - Android smartwatch timer application
-- **Desktop Dashboard** - Python/CustomTkinter management application
+**GET /api/timer/active**
+```
+Headers: Authorization: Bearer <token>
+```
+
+Response:
+```json
+{
+  "active": true,
+  "record": {
+    "record_id": 123,
+    "client_name": "Client A",
+    "start_time": "2025-10-29T10:30:00",
+    "elapsed_seconds": 300
+  }
+}
+```
+
+## Bezpečnosť
+
+- Všetky passwords sa hashujú SHA256
+- JWT tokens platné 30 dní
+- Všetky citlivé údaje v environment variables
+- CORS povolený len pre potrebné sources
+- Password change možný len adminom
+
+## Database Schema
+
+Vyžaduje existujúce tabuľky v MySQL:
+
+- `users` - informácie o užívateľoch
+- `clients` - zoznam klientov
+- `tasks` - zoznam úkonov
+- `time_records` - záznamy času
+
+## Technológie
+
+- Flask 3.0.0
+- PyJWT 2.8.1
+- MySQL Connector 8.2.0
+- Python 3.10+
+
+## Author
+
+Developed for Launchpad Group Dashboard
